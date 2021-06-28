@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends git ffmpeg buil
 
 # Install required Python packages
 RUN pip install numpy scipy librosa future
+RUN pip install python-dateutil
 
 # Install Theano and Lasagne
 RUN pip install -r https://raw.githubusercontent.com/Lasagne/Lasagne/master/requirements.txt
@@ -14,8 +15,4 @@ RUN pip install https://github.com/Lasagne/Lasagne/archive/master.zip
 # Import all scripts
 COPY . ./
 
-# Fetch model
-ADD https://tuc.cloud/index.php/s/m9smX4FkqmJaxLW/download ./model/BirdNET_Soundscape_Model.pkl
-
-# Add entry point to run the script
-ENTRYPOINT [ "python3", "./analyze.py" ]
+WORKDIR .
