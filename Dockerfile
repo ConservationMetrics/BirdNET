@@ -15,4 +15,8 @@ RUN pip install https://github.com/Lasagne/Lasagne/archive/master.zip
 # Import all scripts
 COPY *.py ./
 
+ADD metadata ./metadata
+ADD utils ./utils
+COPY model/model.py ./model/model.py
+
 WORKDIR .
