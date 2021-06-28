@@ -13,6 +13,6 @@ RUN pip install -r https://raw.githubusercontent.com/Lasagne/Lasagne/master/requ
 RUN pip install https://github.com/Lasagne/Lasagne/archive/master.zip
 
 # Import all scripts
-COPY . ./
+COPY *.py ./
 
 WORKDIR .
