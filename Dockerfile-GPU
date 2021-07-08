@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3-dev pyt
 # Install required Python packages
 RUN pip3 install --upgrade pip
 RUN pip3 install numpy scipy cython librosa future
+RUN pip install python-dateutil
 
 # Obtain libgpuarray  & pygpu.
 RUN git clone https://github.com/Theano/libgpuarray.git
@@ -38,10 +39,10 @@ RUN echo "[global]\ndevice=cuda\nfloatX=float32\noptimizer_including=cudnn\n[lib
 RUN pip3 install https://github.com/Lasagne/Lasagne/archive/master.zip
 
 # Import all scripts
-COPY . ./
+COPY *.py ./
 
-# Fetch model
-ADD https://tuc.cloud/index.php/s/m9smX4FkqmJaxLW/download ./model/BirdNET_Soundscape_Model.pkl
+ADD metadata ./metadata
+ADD utils ./utils
+COPY model/model.py ./model/model.py
 
-# Add entry point to run the script
-ENTRYPOINT [ "python3", "./analyze.py" ]
+WORKDIR .
