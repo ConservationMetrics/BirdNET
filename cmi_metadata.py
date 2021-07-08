@@ -1,9 +1,7 @@
 import os
-import time
 import re
-import io
 from datetime import datetime, timedelta
-from six.moves.urllib import request, parse
+from six.moves.urllib import parse
 
 import numpy as np
 
@@ -14,7 +12,7 @@ FILENAME_FORMATS = [
     "site_x_x_yyyymmdd_HHMMSS",
     "site__x__yyyymmdd_HHMMSS",
     "x_x_x_site_x_yyyymmdd_HHMMSS",
-    "site__yyyymmdd_HHMMSS"
+    "site__yyyymmdd_HHMMSS",
 ]
 
 
@@ -24,13 +22,13 @@ def strfind(text, matcher):
 
 def strmatch(matcher, textList):
     regex = re.compile("^{}".format(matcher))
-    matches = [True if re.match(regex, text) else False for text in textList]
+    matches = [re.match(regex, text) for text in textList]
     return np.where(matches)[0]
 
 
 def strcmpi(matcher, textList):
     matcher = matcher.lower()
-    matches = [True if matcher == text.lower() else False for text in textList]
+    matches = [matcher == text.lower() for text in textList]
     return [idx for idx, m in enumerate(matches) if m]
 
 
@@ -45,46 +43,17 @@ def delim_locs(text, delims):
 
     return delimLoc
 
+
 def parse_file_metadata(filename, additional_filename_formats=[]):
     try:
-        theDay, theTime, location, dateCell = parse_all_fmt(filename, FILENAME_FORMATS + additional_filename_formats)
-        datetime = "{} {}".format(theDay, theTime)
+        theDay, theTime, location, dateCell = parse_all_fmt(
+            filename, FILENAME_FORMATS + additional_filename_formats
+        )
+        dt = "{} {}".format(theDay, theTime)
         hour = dateCell[3]
-        return datetime, hour, location
+        return dt, hour, location
     except:
         return "NA", "NA", "NA"
-
-def timestamp_str():
-    return str(int(datetime.now().timestamp() * 10000000))
-
-def execute_bash_list_output(
-    cmd, tmpFileTag="tmp", deleteTmp=True, verbose=True, readOutput=True
-):
-    """
-    output, tmpFileName = execute_bash_list_output(cmd, tmpFileTag='tmp', deleteTmp=True, verbose=True, readOutput=True)
-    """
-
-    # create temp file. keep trying if there was a collision
-    tmpFileName = "{}_{}.txt".format(tmpFileTag, timestamp_str())
-    while os.path.exists(tmpFileName):
-        tmpFileName = "mappedFiles_{}.txt".format(timestamp_str())
-
-    cmd = "{} > {}".format(cmd, tmpFileName)
-    if verbose:
-        print(cmd)
-
-    os.system(cmd)
-
-    if readOutput:
-        output = read_paths(tmpFileName)
-    else:
-        output = []
-
-    if deleteTmp:
-        os.remove(tmpFileName)
-
-    return output, tmpFileName
-
 
 def parse_one_fmt(fileName, fileNameFmt, elapsedWithin=0):
 
@@ -173,6 +142,10 @@ def parse_all_fmt(fileName, fileNameFmt, elapsedWithin=0):
             date_cell = ["NA"] * 6
 
     if location == "NA":
-        print("Warning: Could not parse site/date/time from {} using formats {}".format(fileName, fileNameFmt))
+        print(
+            "Warning: Could not parse site/date/time from {} using formats {}".format(
+                fileName, fileNameFmt
+            )
+        )
 
     return dateField, timeField, location, date_cell
