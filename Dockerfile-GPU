@@ -38,6 +38,8 @@ RUN echo "[global]\ndevice=cuda\nfloatX=float32\noptimizer_including=cudnn\n[lib
 # Install Lasagne
 RUN pip3 install https://github.com/Lasagne/Lasagne/archive/master.zip
 
+RUN pip install pandas python-dateutil
+
 # Import all scripts
 COPY *.py ./
 
