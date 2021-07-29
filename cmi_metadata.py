@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from six.moves.urllib import parse
 
 import numpy as np
+import pandas as pd
 
 audioTypes = ["wav", "WAV", "flac", "aif", "aiff", "mp3"]
 FILENAME_FORMATS = [
@@ -15,6 +16,15 @@ FILENAME_FORMATS = [
     "site__yyyymmdd_HHMMSS",
 ]
 
+SURVEY_SCHEMA = {
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "location": "Sensor_Name",
+    "deployment_date": "Deployment_Date",
+    "deployment_time": "Deployment_Time",
+    "retrieval_date": "Retrieval_Date",
+    "retrieval_time": "Retrieval_Time"
+}
 
 def strfind(text, matcher):
     return [m.start() for m in re.finditer(re.escape(matcher), text)]
@@ -44,7 +54,7 @@ def delim_locs(text, delims):
     return delimLoc
 
 
-def parse_file_metadata(filename, additional_filename_formats=[]):
+def parse_filename_metadata(filename, additional_filename_formats=[]):
     try:
         theDay, theTime, location, dateCell = parse_all_fmt(
             filename, FILENAME_FORMATS + additional_filename_formats
@@ -53,7 +63,7 @@ def parse_file_metadata(filename, additional_filename_formats=[]):
         hour = dateCell[3]
         return dt, hour, location
     except:
-        return "NA", "NA", "NA"
+        return None, None, None
 
 def parse_one_fmt(fileName, fileNameFmt, elapsedWithin=0):
 
@@ -136,12 +146,12 @@ def parse_all_fmt(fileName, fileNameFmt, elapsedWithin=0):
             break
         except Exception as e:
             print(e)
-            location = "NA"
-            dateField = "NA"
-            timeField = "NA"
-            date_cell = ["NA"] * 6
+            location = None
+            dateField = None
+            timeField = None
+            date_cell = [None] * 6
 
-    if location == "NA":
+    if location is None:
         print(
             "Warning: Could not parse site/date/time from {} using formats {}".format(
                 fileName, fileNameFmt
@@ -149,3 +159,42 @@ def parse_all_fmt(fileName, fileNameFmt, elapsedWithin=0):
         )
 
     return dateField, timeField, location, date_cell
+
+def metadata(survey_db, filename, additional_filename_formats=[], survey_schema=SURVEY_SCHEMA):
+    dt, hour, location = parse_filename_metadata(filename, additional_filename_formats)
+
+    # if failed to parse, return empty metadata
+    if dt is None or location is None:
+        return {}
+    elif survey_db is None:
+        return {
+            "location": location,
+            "deployment_datetime": pd.to_datetime(dt)
+        }
+
+    survey_for_location = survey_db[survey_db[survey_schema['location']] == location]
+    if len(survey_for_location) == 0:
+        return {
+            "location": location,
+            "deployment_datetime": pd.to_datetime(dt)
+        }
+    else:
+       survey_for_location = survey_for_location.iloc[0]
+
+    if (pd.to_datetime(dt) > survey_for_location['deployment_datetime'] and
+        pd.to_datetime(dt) < survey_for_location['retrieval_datetime']):
+        return {
+            "location": location,
+            "latitude": survey_for_location[survey_schema['latitude']],
+            "longitude": survey_for_location[survey_schema['longitude']],
+            "deployment_datetime": pd.to_datetime(dt)
+        }
+    else:
+        # if outside of the retrieval/deployment datetimes, return empty metadata
+        return {}
+
+def survey_db(filename, survey_schema=SURVEY_SCHEMA):
+    db = pd.read_csv(filename)
+    db['retrieval_datetime'] = pd.to_datetime(db[survey_schema['retrieval_date']] + " " + db[survey_schema['retrieval_time']])
+    db['deployment_datetime'] = pd.to_datetime(db[survey_schema['deployment_date']] + " " + db[survey_schema['deployment_time']])
+    return db

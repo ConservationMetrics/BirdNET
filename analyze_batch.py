@@ -222,6 +222,17 @@ def arguments():
         description="Compute model predictions on a single .wav file."
     )
     parser.add_argument(
+        '--survey-csv',
+        default=None,
+        help='Path to the CSV file with deployment/survey data'
+    )
+    parser.add_argument(
+        '--survey-schema',
+        help='Survey CSV schema',
+        type=lambda s: json.loads(s),
+        default=cmi_metadata.SURVEY_SCHEMA
+    )
+    parser.add_argument(
         '--output-type',
         default='raven',
         help='Output format of analysis results. Values in [\'audacity\', \'raven\']. Defaults to \'raven\'.'
@@ -253,22 +264,23 @@ def arguments():
     )
     return parser.parse_args()
 
-def week_from_datetime(dt_string):
-    try:
-        return parser.parse(dt_string).isocalendar()[1]
-    except parser.ParserError as e:
-        return None
+def week_from_datetime(dt):
+    return dt.isocalendar()[1]
 
 def ensure_directory(dir_path):
     return pathlib.Path(dir_path).mkdir(parents=True, exist_ok=True)
 
-def resolve_cfg(deployment_datetime, parameters):
-    cfg.DEPLOYMENT_LOCATION = (parameters['lat'], parameters['lon'])
-    cfg.DEPLOYMENT_WEEK = week_from_datetime(deployment_datetime) or parameters['week'] or 25
-    cfg.SPEC_OVERLAP = min(2.9, max(0.0, parameters['overlap']))
-    cfg.SPECS_PER_PREDICTION = max(1, parameters['spp'])
-    cfg.SENSITIVITY = max(min(-0.25, parameters['sensitivity'] * -1), -2.0)
-    cfg.MIN_CONFIDENCE = min(0.99, max(0.01, parameters['min_conf']))
+def resolve_cfg(spp, overlap, sensitivity, min_conf,
+                latitude, longitude, deployment_datetime=None, week=None,
+                **kwargs):
+    if deployment_datetime is not None:
+        week = week_from_datetime(deployment_datetime)
+    cfg.DEPLOYMENT_LOCATION = (latitude, longitude)
+    cfg.DEPLOYMENT_WEEK = week or 25
+    cfg.SPEC_OVERLAP = min(2.9, max(0.0, overlap))
+    cfg.SPECS_PER_PREDICTION = max(1, spp)
+    cfg.SENSITIVITY = max(min(-0.25, sensitivity * -1), -2.0)
+    cfg.MIN_CONFIDENCE = min(0.99, max(0.01, min_conf))
 
 def persist_results(dataset_path, output_type, output):
     if len(output) == 0:
@@ -282,6 +294,14 @@ def persist_results(dataset_path, output_type, output):
 
 def main():
     options = arguments()
+
+    survey_db = None
+    if options.survey_csv is not None:
+        try:
+            survey_db = cmi_metadata.survey_db(options.survey_csv)
+        except Exception as e:
+            print("Couldn't parse survey CSV because [%s]" % e)
+
     # Parse dataset
     dataset = [os.path.join(options.source_dir, source_file)
                for source_file in options.source_files]
@@ -296,14 +316,23 @@ def main():
     loadGridData()
 
     results = ""
+    results_without_metadata = ""
 
     for s in dataset:
-        datetime, hour, location = cmi_metadata.parse_file_metadata(s, options.filename_formats)
-        resolve_cfg(datetime, options.parameters)
+        file_metadata = cmi_metadata.metadata(survey_db, s, options.filename_formats, survey_schema=options.survey_schema)
+
+        configuration = {**options.parameters, **file_metadata}
+        resolve_cfg(**configuration)
+
+        file_results = process(s, options.output_type, model_function)
         # determine location, determine week, set those, run model
-        results += process(s, options.output_type, model_function)
+        if len(file_metadata) > 0:
+            results += file_results
+        else:
+            results_without_metadata += file_results
 
     persist_results(options.dataset_path, options.output_type, results)
+    persist_results(os.path.join(options.dataset_path, "without_metadata"), options.output_type, results_without_metadata)
 
 if __name__ == '__main__':
     main()

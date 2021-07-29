@@ -12,6 +12,8 @@ RUN pip install python-dateutil
 RUN pip install -r https://raw.githubusercontent.com/Lasagne/Lasagne/master/requirements.txt
 RUN pip install https://github.com/Lasagne/Lasagne/archive/master.zip
 
+RUN pip install pandas
+
 # Import all scripts
 COPY *.py ./
 
