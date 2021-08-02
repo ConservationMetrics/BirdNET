@@ -161,7 +161,7 @@ def parse_all_fmt(fileName, fileNameFmt, elapsedWithin=0):
     return dateField, timeField, location, date_cell
 
 def metadata(survey_db, filename, additional_filename_formats=[], survey_schema=SURVEY_SCHEMA):
-    dt, hour, location = parse_filename_metadata(filename, additional_filename_formats)
+    dt, hour, location = parse_filename_metadata(filename, additional_filename_formats or [])
 
     # if failed to parse, return empty metadata
     if dt is None or location is None:

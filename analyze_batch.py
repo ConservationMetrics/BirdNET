@@ -260,7 +260,8 @@ def arguments():
     parser.add_argument(
         "--filename-formats",
         help="Expected filename formats, if non-default",
-        nargs="+"
+        nargs="+",
+        default=[]
     )
     return parser.parse_args()
 
@@ -292,25 +293,31 @@ def persist_results(dataset_path, output_type, output):
             f.write(RAVEN_HEADER)
         f.write(output)
 
-def main():
-    options = arguments()
-
+def main(survey_csv,
+         survey_schema,
+         source_dir,
+         source_files,
+         model_tag_path,
+         filename_formats,
+         dataset_path,
+         output_type,
+         parameters):
     survey_db = None
-    if options.survey_csv is not None:
+    if survey_csv is not None:
         try:
-            survey_db = cmi_metadata.survey_db(options.survey_csv)
+            survey_db = cmi_metadata.survey_db(survey_csv)
         except Exception as e:
             print("Couldn't parse survey CSV because [%s]" % e)
 
     # Parse dataset
-    dataset = [os.path.join(options.source_dir, source_file)
-               for source_file in options.source_files]
+    dataset = [os.path.join(source_dir, source_file)
+               for source_file in source_files]
     if not (len(dataset) > 0):
         print("No source files provided!")
         sys.exit(0)
 
     # Load model
-    model_function = loadModel(options.model_tag_path)
+    model_function = loadModel(model_tag_path)
 
     # Load eBird grid data
     loadGridData()
@@ -319,20 +326,29 @@ def main():
     results_without_metadata = ""
 
     for s in dataset:
-        file_metadata = cmi_metadata.metadata(survey_db, s, options.filename_formats, survey_schema=options.survey_schema)
+        file_metadata = cmi_metadata.metadata(survey_db, s, filename_formats, survey_schema=survey_schema)
 
-        configuration = {**options.parameters, **file_metadata}
+        configuration = {**parameters, **file_metadata}
         resolve_cfg(**configuration)
 
-        file_results = process(s, options.output_type, model_function)
+        file_results = process(s, output_type, model_function)
         # determine location, determine week, set those, run model
         if len(file_metadata) > 0:
             results += file_results
         else:
             results_without_metadata += file_results
 
-    persist_results(options.dataset_path, options.output_type, results)
-    persist_results(os.path.join(options.dataset_path, "without_metadata"), options.output_type, results_without_metadata)
+    persist_results(dataset_path, output_type, results)
+    persist_results(os.path.join(dataset_path, "without_metadata"), output_type, results_without_metadata)
 
 if __name__ == '__main__':
-    main()
+    options = arguments()
+    main(options.survey_csv,
+         options.survey_schema,
+         options.source_dir,
+         options.source_files,
+         options.model_tag_path,
+         options.filename_formats,
+         options.dataset_path,
+         options.output_type,
+         options.parameters)
